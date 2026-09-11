@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: Avian local AI telemetry
+    orgId: 1
+    folder: Avian Local
+    folderUid: avian-local
+    type: file
+    disableDeletion: true
+    editable: false
+    updateIntervalSeconds: 10
+    options:
+      path: /otel-lgtm/avian-codex-workbench.json

@@ -1,0 +1,96 @@
+version: '3'
+
+vars:
+  JS_RUNTIME: '{{default "node" .JS_RUNTIME}}'
+  GRAFANA_PORT: '{{default "3000" .GRAFANA_PORT}}'
+  OTLP_GRPC_PORT: '{{default "4317" .OTLP_GRPC_PORT}}'
+  OTLP_HTTP_PORT: '{{default "4318" .OTLP_HTTP_PORT}}'
+  OLLAMA_GATEWAY_PORT: '{{default "11435" .OLLAMA_GATEWAY_PORT}}'
+  OLLAMA_PORT: '{{default "11434" .OLLAMA_PORT}}'
+  TELEMETRY_TIMEOUT: '{{default "120" .TELEMETRY_TIMEOUT}}'
+  TELEMETRY_COMMAND: >-
+    {{.PYTHON}} scripts/telemetry/local_telemetry.py
+    --grafana-port {{.GRAFANA_PORT}}
+    --otlp-grpc-port {{.OTLP_GRPC_PORT}}
+    --otlp-http-port {{.OTLP_HTTP_PORT}}
+    --ollama-gateway-port {{.OLLAMA_GATEWAY_PORT}}
+    --ollama-port {{.OLLAMA_PORT}}
+
+tasks:
+  check:
+    desc: Run the local AI telemetry policy and Ollama gateway test suites
+    cmds:
+      - '{{.PYTHON}} -m unittest discover -s tests'
+      - go -C telemetry/ollama-gateway test ./...
+      - go -C telemetry/ollama-gateway vet ./...
+      - '{{.JS_RUNTIME}} telemetry/opencode/avian_local_telemetry.test.mjs'
+
+  doctor:
+    desc: Diagnose each AI client, proxy/upstream, collector, backends, authentic activity, and dashboard queries
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} doctor'
+
+  up:
+    desc: Start the complete private local AI telemetry workbench and wait for readiness
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} up --timeout {{.TELEMETRY_TIMEOUT}}'
+
+  status:
+    desc: Report the local AI workbench, proxy, upstream, and endpoint status
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} status'
+
+  open:
+    desc: Open the Local AI Workbench dashboard and always print its URL
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} open'
+
+  logs:
+    desc: Show concise operational logs from the local monitoring stack
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} logs'
+
+  down:
+    desc: Stop the complete local AI telemetry workbench while preserving its data
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} down'
+
+  reset:
+    desc: Delete only the local AI telemetry stack and persistent volume (CONFIRM=1)
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} reset --confirm {{default "0" .CONFIRM}}'
+
+  config:
+    desc: Print the safe user-level Codex OTEL configuration without modifying it
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} config'
+
+  opencode:config:
+    desc: Print the sanitized OpenCode telemetry configuration without modifying it
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} opencode-config'
+
+  opencode:setup:
+    desc: Idempotently install the privacy-safe local OpenCode plugin with backup
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} opencode-setup'
+
+  opencode:check:
+    desc: Check the installed OpenCode version and privacy-safe local plugin
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} opencode-check'
+
+  ollama-gateway:up:
+    desc: Build and start the localhost-only Ollama gateway
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} ollama-gateway-up --timeout {{.TELEMETRY_TIMEOUT}}'
+
+  ollama-gateway:check:
+    desc: Check Ollama gateway health, localhost binding, and Ollama upstream
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} ollama-gateway-check'
+
+  probe:
+    desc: Generate explicitly labeled synthetic OTLP probes excluded from usage totals
+    cmds:
+      - '{{.TELEMETRY_COMMAND}} probe --client {{default "all" .CLIENT}}'

@@ -1,0 +1,63 @@
+[
+  {
+    "event": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "assistant-fixture-success",
+          "sessionID": "session-fixture-success",
+          "role": "assistant",
+          "time": {"created": 1000, "completed": 2500},
+          "parentID": "user-fixture",
+          "modelID": "fixture-model",
+          "providerID": "ollama",
+          "summary": false,
+          "tokens": {"input": 12, "output": 7, "reasoning": 0, "cache": {"read": 3, "write": 1}},
+          "finish": "stop"
+        }
+      }
+    },
+    "expected": {
+      "ai.operation": "turn",
+      "ai.model": "fixture-model",
+      "ai.provider": "ollama",
+      "ai.inference.locality": "local",
+      "ai.outcome": "success",
+      "ai.tokens.input": 12,
+      "ai.tokens.output": 7,
+      "ai.tokens.reasoning": 0,
+      "ai.tokens.cached": 3,
+      "opencode.tokens.cache_write": 1,
+      "ai.duration.total_ms": 1500
+    }
+  },
+  {
+    "event": {
+      "type": "message.updated",
+      "properties": {
+        "info": {
+          "id": "assistant-fixture-cancelled",
+          "sessionID": "session-fixture-cancelled",
+          "role": "assistant",
+          "time": {"created": 3000, "completed": 3200},
+          "parentID": "user-fixture",
+          "modelID": "remote-model",
+          "providerID": "custom-provider",
+          "summary": false,
+          "tokens": {"input": 2, "output": 0, "reasoning": 0, "cache": {"read": 0, "write": 0}},
+          "error": {"name": "MessageAbortedError", "data": {"message": "fixture content that must not be exported"}}
+        }
+      }
+    },
+    "expected": {
+      "ai.operation": "turn",
+      "ai.model": "remote-model",
+      "ai.provider": "custom-provider",
+      "ai.outcome": "cancellation",
+      "ai.tokens.input": 2,
+      "ai.tokens.output": 0,
+      "ai.duration.total_ms": 200,
+      "ai.inference.locality": null
+    }
+  }
+]

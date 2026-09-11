@@ -1,0 +1,266 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  prometheus/collector:
+    config:
+      scrape_configs:
+        - job_name: opentelemetry-collector
+          scrape_interval: 15s
+          static_configs:
+            - targets: [127.0.0.1:8888]
+
+extensions:
+  health_check:
+    endpoint: 127.0.0.1:13133
+    path: /ready
+
+processors:
+  filter/privacy:
+    error_mode: propagate
+    logs:
+      log_record:
+        # These records may contain prompt text or raw tool arguments/output.
+        - attributes["event.name"] == "codex.user_prompt"
+        - attributes["event.name"] == "codex.tool_result"
+        - attributes["event.name"] == "user_prompt"
+        - attributes["event.name"] == "tool_result"
+        - attributes["event.name"] == "opencode.user_prompt"
+        - attributes["event.name"] == "opencode.tool_result"
+
+  filter/usage_authority:
+    error_mode: propagate
+    metrics:
+      datapoint:
+        # Older or diagnostic client exporters cannot contribute to the shared
+        # inference series, even while a client still needs restarting.
+        - IsMatch(metric.name, "^avian\\.ai\\.(inferences|tokens|duration)$") and attributes["ai.usage.authority"] != true
+
+  attributes/privacy:
+    actions:
+      - {key: prompt, action: delete}
+      - {key: response, action: delete}
+      - {key: reasoning, action: delete}
+      - {key: thinking, action: delete}
+      - {key: messages, action: delete}
+      - {key: message, action: delete}
+      - {key: content, action: delete}
+      - {key: image, action: delete}
+      - {key: images, action: delete}
+      - {key: embedding, action: delete}
+      - {key: embeddings, action: delete}
+      - {key: system, action: delete}
+      - {key: environment, action: delete}
+      - {key: env, action: delete}
+      - {key: arguments, action: delete}
+      - {key: args, action: delete}
+      - {key: input, action: delete}
+      - {key: output, action: delete}
+      - {key: input.value, action: delete}
+      - {key: output.value, action: delete}
+      - {key: llm.input_messages, action: delete}
+      - {key: llm.output_messages, action: delete}
+      - {key: gen_ai.prompt, action: delete}
+      - {key: gen_ai.completion, action: delete}
+      - {key: gen_ai.input.messages, action: delete}
+      - {key: gen_ai.output.messages, action: delete}
+      - {key: gen_ai.system_instructions, action: delete}
+      - {key: gen_ai.tool.call.arguments, action: delete}
+      - {key: gen_ai.tool.call.result, action: delete}
+      - {key: tool.input, action: delete}
+      - {key: tool.result, action: delete}
+      - {key: tool.parameters, action: delete}
+      - {key: tool.arguments, action: delete}
+      - {key: tool.output, action: delete}
+      - {key: tool.error, action: delete}
+      - {key: file.path, action: delete}
+      - {key: cwd, action: delete}
+      - {key: directory, action: delete}
+      - {key: worktree, action: delete}
+      - {key: error, action: delete}
+      - {key: error.message, action: delete}
+      - {key: user.account_id, action: delete}
+      - {key: user.email, action: delete}
+      - {key: auth.request_id, action: delete}
+      - {key: auth.cf_ray, action: delete}
+      - {key: auth.agent_id, action: delete}
+      - {key: auth.task_id, action: delete}
+      - {key: auth.env_provider_key_name, action: delete}
+      - {key: auth.env_openai_api_key_present, action: delete}
+      - {key: auth.env_codex_api_key_present, action: delete}
+      - {key: auth.env_codex_api_key_enabled, action: delete}
+      - {key: auth.env_provider_key_present, action: delete}
+      - {key: auth.env_refresh_token_url_override_present, action: delete}
+
+  transform/privacy:
+    error_mode: propagate
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "prompt")
+          - delete_key(attributes, "response")
+          - delete_key(attributes, "reasoning")
+          - delete_key(attributes, "thinking")
+          - delete_key(attributes, "messages")
+          - delete_key(attributes, "message")
+          - delete_key(attributes, "content")
+          - delete_key(attributes, "image")
+          - delete_key(attributes, "images")
+          - delete_key(attributes, "embedding")
+          - delete_key(attributes, "embeddings")
+          - delete_key(attributes, "system")
+          - delete_key(attributes, "environment")
+          - delete_key(attributes, "env")
+          - delete_key(attributes, "arguments")
+          - delete_key(attributes, "args")
+          - delete_key(attributes, "input")
+          - delete_key(attributes, "output")
+          - delete_key(attributes, "input.value")
+          - delete_key(attributes, "output.value")
+          - delete_key(attributes, "llm.input_messages")
+          - delete_key(attributes, "llm.output_messages")
+          - delete_key(attributes, "gen_ai.prompt")
+          - delete_key(attributes, "gen_ai.completion")
+          - delete_key(attributes, "gen_ai.input.messages")
+          - delete_key(attributes, "gen_ai.output.messages")
+          - delete_key(attributes, "gen_ai.system_instructions")
+          - delete_key(attributes, "gen_ai.tool.call.arguments")
+          - delete_key(attributes, "gen_ai.tool.call.result")
+          - delete_key(attributes, "tool.input")
+          - delete_key(attributes, "tool.result")
+          - delete_key(attributes, "tool.parameters")
+          - delete_key(attributes, "tool.arguments")
+          - delete_key(attributes, "tool.output")
+          - delete_key(attributes, "tool.error")
+          - delete_key(attributes, "file.path")
+          - delete_key(attributes, "cwd")
+          - delete_key(attributes, "directory")
+          - delete_key(attributes, "worktree")
+          - delete_key(attributes, "error")
+          - delete_key(attributes, "error.message")
+      - context: spanevent
+        statements:
+          - delete_key(attributes, "prompt")
+          - delete_key(attributes, "response")
+          - delete_key(attributes, "reasoning")
+          - delete_key(attributes, "thinking")
+          - delete_key(attributes, "messages")
+          - delete_key(attributes, "message")
+          - delete_key(attributes, "content")
+          - delete_key(attributes, "image")
+          - delete_key(attributes, "images")
+          - delete_key(attributes, "embedding")
+          - delete_key(attributes, "embeddings")
+          - delete_key(attributes, "system")
+          - delete_key(attributes, "environment")
+          - delete_key(attributes, "env")
+          - delete_key(attributes, "arguments")
+          - delete_key(attributes, "args")
+          - delete_key(attributes, "input")
+          - delete_key(attributes, "output")
+          - delete_key(attributes, "input.value")
+          - delete_key(attributes, "output.value")
+          - delete_key(attributes, "llm.input_messages")
+          - delete_key(attributes, "llm.output_messages")
+          - delete_key(attributes, "gen_ai.prompt")
+          - delete_key(attributes, "gen_ai.completion")
+          - delete_key(attributes, "gen_ai.input.messages")
+          - delete_key(attributes, "gen_ai.output.messages")
+          - delete_key(attributes, "gen_ai.system_instructions")
+          - delete_key(attributes, "gen_ai.tool.call.arguments")
+          - delete_key(attributes, "gen_ai.tool.call.result")
+          - delete_key(attributes, "tool.input")
+          - delete_key(attributes, "tool.parameters")
+          - delete_key(attributes, "tool.arguments")
+          - delete_key(attributes, "tool.output")
+          - delete_key(attributes, "tool.result")
+          - delete_key(attributes, "tool.error")
+          - delete_key(attributes, "file.path")
+          - delete_key(attributes, "cwd")
+          - delete_key(attributes, "directory")
+          - delete_key(attributes, "worktree")
+          - delete_key(attributes, "error")
+          - delete_key(attributes, "error.message")
+          - delete_key(attributes, "auth.request_id")
+          - delete_key(attributes, "auth.cf_ray")
+          - delete_key(attributes, "auth.agent_id")
+          - delete_key(attributes, "auth.task_id")
+          - delete_key(attributes, "auth.env_provider_key_name")
+          - delete_key(attributes, "auth.env_openai_api_key_present")
+          - delete_key(attributes, "auth.env_codex_api_key_present")
+          - delete_key(attributes, "auth.env_codex_api_key_enabled")
+          - delete_key(attributes, "auth.env_provider_key_present")
+          - delete_key(attributes, "auth.env_refresh_token_url_override_present")
+
+    metric_statements:
+      - context: datapoint
+        statements:
+          # Session/conversation identifiers never become Prometheus labels.
+          - delete_key(attributes, "session.id")
+          - delete_key(attributes, "session_id")
+          - delete_key(attributes, "conversation.id")
+          - delete_key(attributes, "conversation_id")
+          - delete_key(attributes, "thread.id")
+          - delete_key(attributes, "project.id")
+          - delete_key(attributes, "file.path")
+          - delete_key(attributes, "cwd")
+          - delete_key(attributes, "directory")
+          - delete_key(attributes, "worktree")
+
+  transform/normalize:
+    error_mode: propagate
+    log_statements:
+      - context: log
+        statements:
+          - set(attributes["ai.client"], "codex") where IsMatch(resource.attributes["service.name"], "^codex")
+          - set(attributes["ai.event.name"], "ai.client.operation.completed") where IsMatch(resource.attributes["service.name"], "^codex") and attributes["event.name"] == "codex.sse_event" and attributes["event.kind"] == "response.completed"
+          - set(attributes["ai.operation"], "turn") where IsMatch(resource.attributes["service.name"], "^codex") and attributes["event.name"] == "codex.sse_event" and attributes["event.kind"] == "response.completed"
+          - set(attributes["ai.outcome"], "success") where IsMatch(resource.attributes["service.name"], "^codex") and attributes["event.name"] == "codex.sse_event" and attributes["event.kind"] == "response.completed"
+          - set(attributes["ai.model"], attributes["model"]) where IsMatch(resource.attributes["service.name"], "^codex") and attributes["model"] != nil
+          - set(attributes["ai.tokens.input"], attributes["input_token_count"]) where IsMatch(resource.attributes["service.name"], "^codex") and attributes["input_token_count"] != nil
+          - set(attributes["ai.tokens.output"], attributes["output_token_count"]) where IsMatch(resource.attributes["service.name"], "^codex") and attributes["output_token_count"] != nil
+          - set(attributes["ai.tokens.cached"], attributes["cached_token_count"]) where IsMatch(resource.attributes["service.name"], "^codex") and attributes["cached_token_count"] != nil
+          - set(attributes["ai.tokens.reasoning"], attributes["reasoning_token_count"]) where IsMatch(resource.attributes["service.name"], "^codex") and attributes["reasoning_token_count"] != nil
+          - set(attributes["ai.telemetry.layer"], "client") where IsMatch(resource.attributes["service.name"], "^codex")
+          - set(attributes["ai.usage.authority"], false) where IsMatch(resource.attributes["service.name"], "^codex")
+    metric_statements:
+      - context: datapoint
+        statements:
+          - set(attributes["ai.client"], "codex") where IsMatch(resource.attributes["service.name"], "^codex")
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["ai.client"], "codex") where IsMatch(resource.attributes["service.name"], "^codex")
+
+  batch:
+
+exporters:
+  otlp_http/metrics:
+    endpoint: http://127.0.0.1:9090/api/v1/otlp
+    tls: {insecure: true}
+  otlp_http/traces:
+    endpoint: http://127.0.0.1:4418
+    tls: {insecure: true}
+  otlp_http/logs:
+    endpoint: http://127.0.0.1:3100/otlp
+    tls: {insecure: true}
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/normalize, transform/privacy, batch]
+      exporters: [otlp_http/traces]
+    metrics:
+      receivers: [otlp, prometheus/collector]
+      processors: [filter/usage_authority, transform/normalize, transform/privacy, batch]
+      exporters: [otlp_http/metrics]
+    logs:
+      receivers: [otlp]
+      processors: [filter/privacy, transform/normalize, attributes/privacy, batch]
+      exporters: [otlp_http/logs]

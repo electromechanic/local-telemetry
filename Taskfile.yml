@@ -1,0 +1,18 @@
+version: '3'
+
+vars:
+  PYTHON: '{{if eq OS "windows"}}python{{else}}python3{{end}}'
+
+includes:
+  telemetry: .taskfiles/telemetry.yml
+
+tasks:
+  check:
+    desc: Run all local telemetry source checks
+    cmds:
+      - task: telemetry:check
+
+  list:
+    desc: List local telemetry commands
+    cmds:
+      - task --list

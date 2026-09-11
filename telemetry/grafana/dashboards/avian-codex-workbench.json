@@ -1,0 +1,379 @@
+{
+  "annotations": {"list": []},
+  "description": "Local, privacy-filtered Codex, OpenCode, and Ollama telemetry. Synthetic probes are excluded from authentic totals. Missing source measurements remain missing; local inference is unpriced rather than reported as zero cost.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"asDropdown": false, "icon": "external link", "includeVars": true, "keepTime": true, "tags": [], "targetBlank": false, "title": "Explore sanitized logs", "type": "link", "url": "/explore?left={\"datasource\":\"avian-loki\",\"queries\":[{\"refId\":\"A\",\"expr\":\"{service_name=~\\\"codex.*|opencode|ollama-gateway\\\"}\"}]}"},
+    {"asDropdown": false, "icon": "external link", "includeVars": true, "keepTime": true, "tags": [], "targetBlank": false, "title": "Explore traces", "type": "link", "url": "/explore?left={\"datasource\":\"avian-tempo\",\"queries\":[{\"refId\":\"A\",\"queryType\":\"search\"}]}"}
+  ],
+  "panels": [
+    {
+      "datasource": {"type": "datasource", "uid": "-- Mixed --"},
+      "description": "Collector freshness, the latest explicit synthetic transport probe, and authentic completed-response telemetry. Run task telemetry:doctor to refresh the transport probe. Idle is healthy and does not mean ingestion failed.",
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "thresholds"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}},
+        "overrides": [
+          {"matcher": {"id": "byFrameRefID", "options": "A"}, "properties": [{"id": "displayName", "value": "Collector"}, {"id": "mappings", "value": [{"options": {"0": {"color": "red", "index": 0, "text": "Collector unavailable"}, "1": {"color": "green", "index": 1, "text": "Collector healthy"}}, "type": "value"}]}]},
+          {"matcher": {"id": "byFrameRefID", "options": "B"}, "properties": [{"id": "displayName", "value": "Transport"}, {"id": "mappings", "value": [{"options": {"0": {"color": "red", "index": 0, "text": "Transport probe failed or stale"}, "1": {"color": "green", "index": 1, "text": "Transport probe passed"}}, "type": "value"}]}]},
+          {"matcher": {"id": "byFrameRefID", "options": "C"}, "properties": [{"id": "displayName", "value": "Codex completion"}, {"id": "mappings", "value": [{"options": {"0": {"color": "blue", "index": 0, "text": "Healthy; waiting for completed response"}, "1": {"color": "green", "index": 1, "text": "Authentic Codex telemetry observed"}}, "type": "value"}]}]}
+        ]
+      },
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 75},
+      "id": 1,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "avian-prometheus"}, "editorMode": "code", "expr": "((time() - max(timestamp(otelcol_process_uptime_total)) < bool 45) or on() vector(0))", "instant": true, "legendFormat": "Collector", "range": false, "refId": "A"},
+        {"datasource": {"type": "prometheus", "uid": "avian-prometheus"}, "editorMode": "code", "expr": "((time() - max(max_over_time(timestamp(avian_telemetry_transport_probe_total{job=\"avian-telemetry-probe\", avian_synthetic=\"true\"})[30m:])) < bool 1800) or on() vector(0))", "instant": true, "legendFormat": "Transport", "range": false, "refId": "B"},
+        {"datasource": {"type": "prometheus", "uid": "avian-prometheus"}, "editorMode": "code", "expr": "((sum(count_over_time(codex_websocket_event_total{job=~\"codex_cli_rs|codex_exec\", kind=\"response.completed\", success=\"true\"}[30m])) > bool 0) or on() vector(0))", "instant": true, "legendFormat": "Codex completion", "range": false, "refId": "C"}
+      ],
+      "title": "Local ingestion health",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Direct codex.conversation_starts log events, counted over time.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisLabel": "", "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 45, "gradientMode": "none", "hideFrom": {"legend": false, "tooltip": false, "viz": false}, "lineInterpolation": "linear", "lineWidth": 1, "pointSize": 5, "scaleDistribution": {"type": "linear"}, "showPoints": "never", "spanNulls": false, "stacking": {"group": "A", "mode": "normal"}, "thresholdsStyle": {"mode": "off"}}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 75},
+      "id": 2,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "list", "placement": "bottom", "showLegend": true}, "tooltip": {"hideZeros": false, "mode": "single", "sort": "none"}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.conversation_starts` [$__auto]))", "legendFormat": "sessions", "queryType": "range", "refId": "A"}],
+      "title": "Sessions started",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Direct conversation-start metadata grouped by model and configured reasoning effort.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 75},
+      "id": 3,
+      "options": {"displayLabels": ["name", "percent"], "legend": {"displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "tooltip": {"hideZeros": false, "mode": "single", "sort": "none"}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (model, reasoning_effort) (count_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.conversation_starts` [$__range]))", "legendFormat": "{{model}} / {{reasoning_effort}}", "queryType": "instant", "refId": "A"}],
+      "title": "Sessions by model and reasoning",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "avian-prometheus"},
+      "description": "Direct Codex WebSocket request counter, derived into interval success/failure counts.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "bars", "fillOpacity": 40, "lineWidth": 1, "showPoints": "never", "stacking": {"group": "A", "mode": "normal"}}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 83},
+      "id": 4,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"editorMode": "code", "expr": "sum by (success) (increase(codex_websocket_request_total{job=~\"codex_cli_rs|codex_exec\"}[$__rate_interval]))", "legendFormat": "success={{success}}", "range": true, "refId": "A"}],
+      "title": "WebSocket request outcomes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "avian-prometheus"},
+      "description": "Percentiles derived from the directly emitted Responses API engine time-to-first-token histogram.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 12, "lineWidth": 2, "showPoints": "never"}, "mappings": [], "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 8, "y": 83},
+      "id": 5,
+      "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"editorMode": "code", "expr": "histogram_quantile(0.50, sum by (le) (rate(codex_responses_api_engine_iapi_ttft_duration_ms_milliseconds_bucket{job=~\"codex_cli_rs|codex_exec\"}[$__rate_interval])))", "legendFormat": "p50", "range": true, "refId": "A"},
+        {"editorMode": "code", "expr": "histogram_quantile(0.95, sum by (le) (rate(codex_responses_api_engine_iapi_ttft_duration_ms_milliseconds_bucket{job=~\"codex_cli_rs|codex_exec\"}[$__rate_interval])))", "legendFormat": "p95", "range": true, "refId": "B"},
+        {"editorMode": "code", "expr": "histogram_quantile(0.99, sum by (le) (rate(codex_responses_api_engine_iapi_ttft_duration_ms_milliseconds_bucket{job=~\"codex_cli_rs|codex_exec\"}[$__rate_interval])))", "legendFormat": "p99", "range": true, "refId": "C"}
+      ],
+      "title": "Time to first token percentiles",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "avian-prometheus"},
+      "description": "Direct codex.tool.call counter grouped by tool.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 83},
+      "id": 6,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "Value"}]},
+      "targets": [{"editorMode": "code", "expr": "round(sum by (tool) (increase(codex_tool_call_total{job=~\"codex_cli_rs|codex_exec\"}[$__range])))", "format": "table", "instant": true, "legendFormat": "{{tool}}", "refId": "A"}],
+      "title": "Tool calls by tool",
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"Value": "Calls", "tool": "Tool"}}}],
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "avian-prometheus"},
+      "description": "Success rate derived from the directly emitted tool counter's success tag.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "decimals": 1, "mappings": [], "max": 100, "min": 0, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 80}, {"color": "green", "value": 95}]}, "unit": "percent"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 91},
+      "id": 7,
+      "options": {"displayMode": "gradient", "maxVizHeight": 300, "minVizHeight": 10, "minVizWidth": 0, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true, "sizing": "auto", "valueMode": "color"},
+      "targets": [{"editorMode": "code", "expr": "100 * sum by (tool) (increase(codex_tool_call_total{job=~\"codex_cli_rs|codex_exec\", success=\"true\"}[$__range])) / sum by (tool) (increase(codex_tool_call_total{job=~\"codex_cli_rs|codex_exec\"}[$__range]))", "instant": true, "legendFormat": "{{tool}}", "refId": "A"}],
+      "title": "Tool success rate",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "avian-prometheus"},
+      "description": "p95 duration derived from the installed Codex tool-call histogram; sorted to surface slow tools.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [], "unit": "ms"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 91},
+      "id": 8,
+      "options": {"displayMode": "lcd", "maxVizHeight": 300, "minVizHeight": 10, "minVizWidth": 0, "namePlacement": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showUnfilled": true, "sizing": "auto", "valueMode": "color"},
+      "targets": [{"editorMode": "code", "expr": "topk(8, histogram_quantile(0.95, sum by (tool, le) (rate(codex_tool_call_duration_ms_milliseconds_bucket{job=~\"codex_cli_rs|codex_exec\"}[$__rate_interval]))))", "instant": true, "legendFormat": "{{tool}}", "refId": "A"}],
+      "title": "Slowest tools (p95)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Token fields on authentic response.completed events. Cached tokens are a subset of input tokens, so the series are intentionally not stacked or added together.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"axisCenteredZero": false, "axisColorMode": "text", "axisPlacement": "auto", "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "showPoints": "never", "stacking": {"group": "A", "mode": "normal"}}, "mappings": [], "unit": "short"}, "overrides": []},
+      "gridPos": {"h": 6, "w": 12, "x": 12, "y": 91},
+      "id": 9,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (model) (sum_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.sse_event` | event_kind = `response.completed` | unwrap input_token_count [$__auto]))", "legendFormat": "{{model}} / input", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (model) (sum_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.sse_event` | event_kind = `response.completed` | unwrap cached_token_count [$__auto]))", "legendFormat": "{{model}} / cached input", "queryType": "range", "refId": "B"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (model) (sum_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.sse_event` | event_kind = `response.completed` | unwrap output_token_count [$__auto]))", "legendFormat": "{{model}} / output", "queryType": "range", "refId": "C"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (model) (sum_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.sse_event` | event_kind = `response.completed` | unwrap reasoning_token_count [$__auto]))", "legendFormat": "{{model}} / reasoning", "queryType": "range", "refId": "D"}
+      ],
+      "title": "Completed-response token fields",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Direct codex.tool_decision events grouped into approval and denial decisions.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 7, "w": 7, "x": 0, "y": 97},
+      "id": 10,
+      "options": {"displayLabels": ["name", "value"], "legend": {"displayMode": "table", "placement": "right", "showLegend": true, "values": ["value"]}, "pieType": "pie", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (decision) (count_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.tool_decision` [$__range]))", "legendFormat": "{{decision}}", "queryType": "instant", "refId": "A"}],
+      "title": "Approval decisions and denials",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Client versions observed on authentic Codex conversation-start events.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"align": "auto", "cellOptions": {"type": "auto"}}, "mappings": []}, "overrides": []},
+      "gridPos": {"h": 7, "w": 5, "x": 7, "y": 97},
+      "id": 11,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (service_version) (count_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.conversation_starts` [$__range]))", "legendFormat": "{{service_version}}", "queryType": "instant", "refId": "A"}],
+      "title": "Codex versions observed",
+      "transformations": [{"id": "organize", "options": {"excludeByName": {"Time": true}, "renameByName": {"Value": "Sessions", "Value #A": "Sessions", "service_version": "Version"}}}],
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Sanitized failed API/WebSocket events. Raw error messages, prompt records, and tool-result records are removed before Loki storage.",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 97},
+      "id": 12,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "{service_name=\"codex_cli_rs\"} | event_name = `codex.api_request` | http_response_status_code !~ `2..`", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "{service_name=\"codex_cli_rs\"} | event_name =~ `codex.websocket_request|codex.websocket_connect` | success = `false`", "queryType": "range", "refId": "B"}
+      ],
+      "title": "Recent sanitized errors",
+      "type": "logs"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"},
+      "description": "Conversation IDs and trace IDs support pivoting into the provisioned Loki and Tempo Explore views. No prompt or raw tool-result payload is retained.",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 16, "x": 0, "y": 104},
+      "id": 13,
+      "options": {"dedupStrategy": "signature", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "{service_name=\"codex_cli_rs\"} | event_name =~ `codex.conversation_starts|codex.api_request|codex.tool_decision|codex.sandbox_outcome`", "queryType": "range", "refId": "A"}],
+      "title": "Conversation and failure investigation",
+      "type": "logs"
+    },
+    {
+      "datasource": {"type": "tempo", "uid": "avian-tempo"},
+      "description": "Authentic Codex traces from the local Tempo backend. Synthetic probe traces use a different service name and are excluded.",
+      "fieldConfig": {"defaults": {}, "overrides": []},
+      "gridPos": {"h": 8, "w": 8, "x": 16, "y": 104},
+      "id": 14,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "targets": [{"datasource": {"type": "tempo", "uid": "avian-tempo"}, "limit": 20, "query": "{ resource.service.name = \"codex_cli_rs\" }", "queryType": "traceql", "refId": "A", "tableType": "traces"}],
+      "title": "Recent Codex traces",
+      "type": "table"
+    },
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 0}, "id": 15, "panels": [], "title": "Overview — inference usage and client activity", "type": "row"},
+    {
+      "datasource": {"type": "datasource", "uid": "-- Mixed --"},
+      "description": "Synthetic transport and authentic source activity. Healthy transport does not prove that clients use the gateway; direct Ollama traffic bypasses it.",
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "mappings": [{"options": {"0": {"color": "blue", "index": 0, "text": "Idle / unavailable; compare path tile"}, "1": {"color": "green", "index": 1, "text": "Healthy / observed"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 1}, "id": 16,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "name"},
+      "targets": [
+        {"datasource": {"type": "prometheus", "uid": "avian-prometheus"}, "editorMode": "code", "expr": "((time() - max(max_over_time(timestamp(avian_telemetry_transport_probe_total{job=\"avian-telemetry-probe\",avian_synthetic=\"true\",ai_client=\"codex\"})[30m:])) < bool 1800) or on() vector(0))", "instant": true, "legendFormat": "Codex path", "range": false, "refId": "A"},
+        {"datasource": {"type": "loki", "uid": "avian-loki"}, "editorMode": "code", "expr": "(sum(count_over_time({service_name=\"codex_cli_rs\"} | ai_event_name = `ai.client.operation.completed` [30m])) > bool 0) or vector(0)", "legendFormat": "Codex activity", "queryType": "instant", "refId": "B"},
+        {"datasource": {"type": "prometheus", "uid": "avian-prometheus"}, "editorMode": "code", "expr": "((time() - max(max_over_time(timestamp(avian_telemetry_transport_probe_total{job=\"avian-telemetry-probe\",avian_synthetic=\"true\",ai_client=\"opencode\"})[30m:])) < bool 1800) or on() vector(0))", "instant": true, "legendFormat": "OpenCode path", "range": false, "refId": "C"},
+        {"datasource": {"type": "loki", "uid": "avian-loki"}, "editorMode": "code", "expr": "(sum(count_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` [30m])) > bool 0) or vector(0)", "legendFormat": "OpenCode activity", "queryType": "instant", "refId": "D"},
+        {"datasource": {"type": "prometheus", "uid": "avian-prometheus"}, "editorMode": "code", "expr": "((time() - max(max_over_time(timestamp(avian_telemetry_transport_probe_total{job=\"avian-telemetry-probe\",avian_synthetic=\"true\",ai_client=\"ollama\"})[30m:])) < bool 1800) or on() vector(0))", "instant": true, "legendFormat": "Ollama gateway path", "range": false, "refId": "E"},
+        {"datasource": {"type": "loki", "uid": "avian-loki"}, "editorMode": "code", "expr": "(sum(count_over_time({service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` [30m])) > bool 0) or vector(0)", "legendFormat": "Ollama gateway activity", "queryType": "instant", "refId": "F"}
+      ],
+      "title": "Telemetry health by source", "type": "stat"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "bars", "fillOpacity": 45, "lineWidth": 1, "showPoints": "never", "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 8, "x": 8, "y": 1}, "id": 17,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_client) (count_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | ai_model =~ `${model:regex}` [$__auto]))", "legendFormat": "{{ai_client}}", "queryType": "range", "refId": "A"}],
+      "title": "Inference requests by client", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Codex conversation starts and OpenCode sessions. Ollama supplies no conversation identifier, so no Alpaca value is fabricated.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 6, "w": 8, "x": 16, "y": 1}, "id": 18,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"codex_cli_rs\"} | event_name = `codex.conversation_starts` [$__auto]))", "legendFormat": "codex", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"opencode\"} | event_name = `opencode.session.created` [$__auto]))", "legendFormat": "opencode", "queryType": "range", "refId": "B"}
+      ], "title": "Sessions / conversations", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 18, "lineWidth": 2, "showPoints": "never"}, "unit": "short"}, "overrides": []}, "gridPos": {"h": 7, "w": 12, "x": 0, "y": 7}, "id": 19,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (ai_client) (sum_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | ai_model =~ `${model:regex}` | unwrap ai_tokens_input | __error__=`` [$__auto]))", "legendFormat": "{{ai_client}} input", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (ai_client) (sum_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | ai_model =~ `${model:regex}` | unwrap ai_tokens_output | __error__=`` [$__auto]))", "legendFormat": "{{ai_client}} output", "queryType": "range", "refId": "B"}
+      ], "title": "Input and output tokens by client", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 6, "x": 12, "y": 7}, "id": 20,
+      "options": {"displayLabels": ["name", "percent"], "legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_inference_locality) (count_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_inference_locality != `` [$__range]))", "legendFormat": "{{ai_inference_locality}}", "queryType": "instant", "refId": "A"}], "title": "Local versus remote", "type": "piechart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 6, "x": 18, "y": 7}, "id": 21,
+      "options": {"displayLabels": ["name", "value"], "legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "pieType": "pie", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_client, ai_outcome) (count_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` [$__range]))", "legendFormat": "{{ai_client}} / {{ai_outcome}}", "queryType": "instant", "refId": "A"}], "title": "Successful, failed, cancelled", "type": "piechart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 12, "x": 0, "y": 14}, "id": 22,
+      "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (ai_client, ai_model) (count_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | ai_model =~ `${model:regex}` [$__range]))", "legendFormat": "{{ai_client}} / {{ai_model}}", "queryType": "instant", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum by (ai_client, ai_provider) (count_over_time({service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_provider =~ `${provider:regex}` [$__range]))", "legendFormat": "{{ai_client}} / {{ai_provider}}", "queryType": "instant", "refId": "B"}
+      ], "title": "Model and provider breakdown", "type": "barchart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.",
+      "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "custom": {"drawStyle": "line", "fillOpacity": 12, "lineWidth": 2, "showPoints": "never"}}, "overrides": []}, "gridPos": {"h": 7, "w": 12, "x": 12, "y": 14}, "id": 23,
+      "options": {"legend": {"calcs": ["mean"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "avg by (ai_client, service_name) (avg_over_time({service_name=\"opencode\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | unwrap ai_duration_total_ms | __error__=`` [$__auto])) or avg by (ai_client, service_name) (avg_over_time({service_name=\"ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | unwrap ai_duration_wall_ms | __error__=`` [$__auto]))", "legendFormat": "{{ai_client}} duration ms", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "avg(avg_over_time({service_name=\"ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | unwrap ai_throughput_output_tokens_per_second | __error__=`` [$__auto]))", "legendFormat": "ollama output tokens/s", "queryType": "range", "refId": "B"}
+      ], "title": "Duration and generation throughput", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Authoritative inference observations: Ollama gateway plus verified remote OpenCode providers. Local and unknown-provider client observations are excluded to prevent duplicate usage. Codex usage remains in its dedicated client panels.", "fieldConfig": {"defaults": {}, "overrides": []}, "gridPos": {"h": 8, "w": 24, "x": 0, "y": 21}, "id": 24,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": false, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "{service_name=~\"opencode|ollama-gateway\"} | ai_event_name = `ai.inference.completed` | ai_usage_authority = `true` | ai_client =~ `${client:regex}` | ai_model =~ `${model:regex}`", "queryType": "range", "refId": "A"}], "title": "Recent authentic activity", "type": "logs"
+    },
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 30}, "id": 30, "panels": [], "title": "OpenCode", "type": "row"},
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Sessions and completed user-facing turns; summary operations remain separately identifiable.", "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 0, "y": 31}, "id": 31,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"opencode\"} | event_name = `opencode.session.created` [$__auto]))", "legendFormat": "sessions", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_operation = `turn` | ai_project_name =~ `${project:regex}` [$__auto]))", "legendFormat": "turns", "queryType": "range", "refId": "B"}
+      ], "title": "Sessions and turns", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 8, "y": 31}, "id": 32,
+      "options": {"displayLabels": ["name", "value"], "legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_provider, ai_model) (count_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_provider =~ `${provider:regex}` | ai_model =~ `${model:regex}` | ai_project_name =~ `${project:regex}` [$__range]))", "legendFormat": "{{ai_provider}} / {{ai_model}}", "queryType": "instant", "refId": "A"}], "title": "Provider / model usage", "type": "piechart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 16, "y": 31}, "id": 33,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_model =~ `${model:regex}` | unwrap ai_tokens_input | __error__=`` [$__auto])", "legendFormat": "input", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_model =~ `${model:regex}` | unwrap ai_tokens_output | __error__=`` [$__auto])", "legendFormat": "output", "queryType": "range", "refId": "B"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_model =~ `${model:regex}` | unwrap ai_tokens_reasoning | __error__=`` [$__auto])", "legendFormat": "reasoning", "queryType": "range", "refId": "C"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum_over_time({service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_model =~ `${model:regex}` | unwrap ai_tokens_cached | __error__=`` [$__auto])", "legendFormat": "cached", "queryType": "range", "refId": "D"}
+      ], "title": "Token usage", "type": "timeseries",
+      "description": "Client-reported tokens, including local requests. These are diagnostic client observations; never add them to gateway inference totals."
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 0, "y": 38}, "id": 34,
+      "options": {"legend": {"displayMode": "table", "placement": "right", "showLegend": true}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (opencode_tool_name, ai_outcome) (count_over_time({service_name=\"opencode\"} | event_name = `opencode.tool.completed` [$__range]))", "legendFormat": "{{opencode_tool_name}} / {{ai_outcome}}", "queryType": "instant", "refId": "A"}], "title": "Tool executions and failures", "type": "barchart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 8, "y": 38}, "id": 35,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"opencode\"} | event_name = `opencode.retry` [$__auto]))", "legendFormat": "retries", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum(count_over_time({service_name=\"opencode\"} | event_name = `opencode.session.compacted` [$__auto]))", "legendFormat": "compactions", "queryType": "range", "refId": "B"}
+      ], "title": "Retries and compactions", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "ms"}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 16, "y": 38}, "id": 36,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "quantile_over_time(0.95, {service_name=\"opencode\"} | event_name = `opencode.operation.completed` | ai_model =~ `${model:regex}` | unwrap ai_duration_total_ms | __error__=`` [$__auto])", "legendFormat": "p95", "queryType": "range", "refId": "A"}], "title": "Operation latency", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "Sanitized error type and outcome only; raw messages and payloads are never exported.", "fieldConfig": {"defaults": {}, "overrides": []}, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 45}, "id": 37,
+      "options": {"dedupStrategy": "signature", "enableLogDetails": true, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "{service_name=\"opencode\"} | event_name =~ `opencode.operation.completed|opencode.session.error|opencode.tool.completed` | ai_outcome =~ `failure|cancellation`", "queryType": "range", "refId": "A"}], "title": "OpenCode errors and cancellations", "type": "logs"
+    },
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 52}, "id": 40, "panels": [], "title": "Shared Ollama gateway", "type": "row"},
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 0, "y": 53}, "id": 41,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_operation) (count_over_time({service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` | ai_model =~ `${model:regex}` [$__auto]))", "legendFormat": "{{ai_operation}}", "queryType": "range", "refId": "A"}], "title": "Generations", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 8, "y": 53}, "id": 42,
+      "options": {"displayLabels": ["name", "value"], "legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "donut", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_model) (count_over_time({service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` | ai_model =~ `${model:regex}` [$__range]))", "legendFormat": "{{ai_model}}", "queryType": "instant", "refId": "A"}], "title": "Model usage", "type": "piechart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "short"}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 16, "y": 53}, "id": 43,
+      "options": {"legend": {"calcs": ["sum"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "sum_over_time({service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` | ai_model =~ `${model:regex}` | unwrap ai_tokens_input | __error__=`` [$__auto])", "legendFormat": "input", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "sum_over_time({service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` | ai_model =~ `${model:regex}` | unwrap ai_tokens_output | __error__=`` [$__auto])", "legendFormat": "output", "queryType": "range", "refId": "B"}
+      ], "title": "Input / output tokens", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "unit": "ms"}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 0, "y": 60}, "id": 44,
+      "options": {"legend": {"calcs": ["mean"], "displayMode": "table", "placement": "bottom", "showLegend": true}},
+      "targets": [
+        {"direction": "backward", "editorMode": "code", "expr": "avg_over_time({service_name=\"ollama-gateway\"} | unwrap ai_duration_model_load_ms | __error__=`` [$__auto])", "legendFormat": "model load", "queryType": "range", "refId": "A"},
+        {"direction": "backward", "editorMode": "code", "expr": "avg_over_time({service_name=\"ollama-gateway\"} | unwrap ai_duration_prompt_evaluation_ms | __error__=`` [$__auto])", "legendFormat": "prompt evaluation", "queryType": "range", "refId": "B"},
+        {"direction": "backward", "editorMode": "code", "expr": "avg_over_time({service_name=\"ollama-gateway\"} | unwrap ai_duration_generation_ms | __error__=`` [$__auto])", "legendFormat": "generation", "queryType": "range", "refId": "C"}
+      ], "title": "Model-load / prompt / generation time", "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "unit": "ops"}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 8, "y": 60}, "id": 45,
+      "options": {"orientation": "horizontal", "reduceOptions": {"calcs": ["mean"], "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "avg_over_time({service_name=\"ollama-gateway\"} | ai_model =~ `${model:regex}` | unwrap ai_throughput_output_tokens_per_second | __error__=`` [$__range])", "legendFormat": "output tokens/s", "queryType": "instant", "refId": "A"}], "title": "Generation throughput", "type": "gauge"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}}, "overrides": []}, "gridPos": {"h": 7, "w": 8, "x": 16, "y": 60}, "id": 46,
+      "options": {"displayLabels": ["name", "value"], "legend": {"displayMode": "table", "placement": "right", "showLegend": true}, "pieType": "pie", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "sum by (ai_finish_reason, ai_outcome) (count_over_time({service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` [$__range]))", "legendFormat": "{{ai_finish_reason}} / {{ai_outcome}}", "queryType": "instant", "refId": "A"}], "title": "Stop reasons, failures, cancellations", "type": "piechart"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "avian-loki"}, "description": "No upstream error text or response content is retained.", "fieldConfig": {"defaults": {}, "overrides": []}, "gridPos": {"h": 6, "w": 24, "x": 0, "y": 67}, "id": 47,
+      "options": {"dedupStrategy": "signature", "enableLogDetails": true, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"direction": "backward", "editorMode": "code", "expr": "{service_name=\"ollama-gateway\"} | event_name = `ollama.inference.completed` | ai_outcome =~ `failure|cancellation`", "queryType": "range", "refId": "A"}], "title": "Ollama failures and cancellations", "type": "logs"
+    },
+    {"collapsed": false, "gridPos": {"h": 1, "w": 24, "x": 0, "y": 74}, "id": 50, "panels": [], "title": "Codex — preserved panels", "type": "row"}
+  ],
+  "refresh": "15s",
+  "schemaVersion": 41,
+  "tags": ["avian", "codex", "opencode", "alpaca", "ollama", "local", "opentelemetry"],
+  "templating": {"list": [
+    {"allValue": ".*", "current": {"selected": true, "text": "All", "value": "$__all"}, "hide": 0, "includeAll": true, "label": "Client", "multi": true, "name": "client", "options": [], "query": "codex,opencode,alpaca,cli,unknown", "skipUrlSync": false, "type": "custom"},
+    {"current": {"selected": true, "text": ".*", "value": ".*"}, "hide": 0, "label": "Model regex", "name": "model", "options": [], "query": ".*", "skipUrlSync": false, "type": "textbox"},
+    {"current": {"selected": true, "text": ".*", "value": ".*"}, "hide": 0, "label": "Provider regex", "name": "provider", "options": [], "query": ".*", "skipUrlSync": false, "type": "textbox"},
+    {"current": {"selected": true, "text": ".*", "value": ".*"}, "hide": 0, "label": "Project regex", "name": "project", "options": [], "query": ".*", "skipUrlSync": false, "type": "textbox"}
+  ]},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {"refresh_intervals": ["5s", "15s", "30s", "1m", "5m"]},
+  "timezone": "browser",
+  "title": "Avian Local AI Workbench",
+  "uid": "avian-codex-workbench",
+  "version": 3,
+  "weekStart": ""
+}
